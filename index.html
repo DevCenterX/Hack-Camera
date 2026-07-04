@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>StudioFace AR - Filtros de Realidad Aumentada</title>
+    
+    <!-- Tailwind CSS para el diseño premium -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons para interfaz profesional (sin emojis) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Librería de rastreo facial robusta desde CDN de alta velocidad -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clmtrackr/1.1.2/clmtrackr.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clmtrackr/1.1.2/models/model_pca_20_svm.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: radial-gradient(circle at top, #111827, #030712);
+        }
+        /* Efecto de cristal esmerilado */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+    <!-- ENCABEZADO -->
+    <header class="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between items-center border-b border-slate-800/60 gap-4">
+        <div class="flex items-center gap-3">
+            <div class="bg-indigo-600 p-2 sm:p-2.5 rounded-xl shadow-lg shadow-indigo-500/20">
+                <i data-lucide="scan-face" class="w-5 h-5 sm:w-6 sm:h-6 text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-lg sm:text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent">StudioFace AR</h1>
+                <p class="text-[10px] sm:text-xs text-indigo-400 font-medium">Filtros Profesionales en Tiempo Real</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 bg-slate-900/80 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-slate-800 text-[10px] sm:text-xs">
+            <span id="status-indicator" class="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+            <span id="status-text" class="text-slate-300 font-semibold">Iniciando módulos de IA...</span>
+        </div>
+        <a href="filter/index.php" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs sm:text-sm px-3 py-2 rounded-full shadow-lg shadow-indigo-500/20">Filtro</a>
+    </header>
+
+    <!-- PANTALLA DE SOLICITUD DE CÁMARA (Bloqueo inicial obligado) -->
+    <div id="permission-overlay" class="fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center p-4">
+        <div class="max-w-md w-full glass-panel p-8 rounded-3xl text-center shadow-2xl relative overflow-hidden">
+            <div class="absolute -top-12 -left-12 w-40 h-40 bg-indigo-500/10 rounded-full blur-2xl"></div>
+            
+            <div id="permission-icon-container" class="w-16 h-16 bg-indigo-600/15 text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-indigo-500/20">
+                <i data-lucide="camera" class="w-8 h-8 animate-pulse"></i>
+            </div>
+            
+            <h2 id="permission-title" class="text-xl font-bold mb-3 text-white">Solicitando Cámara</h2>
+            <p id="permission-desc" class="text-slate-400 text-sm mb-6 leading-relaxed">
+                Por favor, acepta el permiso de la cámara para que el sistema de inteligencia artificial pueda aplicar los filtros en tiempo real sobre tu rostro.
+            </p>
+            
+            <button id="btnRequestPermission" class="hidden w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-200 flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20">
+                <i data-lucide="video"></i>
+                Permitir Acceso a la Cámara
+            </button>
+        </div>
+    </div>
+
+    <!-- ÁREA PRINCIPAL -->
+    <main class="flex-grow w-full max-w-7xl mx-auto px-4 md:px-6 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+        
+        <!-- VISUALIZADOR DE CÁMARA (Izquierda - 8 Cols) -->
+        
+        <div class="lg:col-span-7 xl:col-span-8 flex flex-col gap-4 w-full">
+            
+            <div class="relative w-full aspect-[4/3] bg-slate-950 rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-800 shadow-2xl">
+                
+                <!-- Video oculto para el rastreo de clmtrackr -->
+                <video id="webcam" class="hidden" autoplay playsinline muted></video>
+
+                <!-- Canvas dinámico para renderizar video en espejo con filtros alineados -->
+                <canvas id="arCanvas" class="absolute inset-0 w-full h-full object-cover z-10"></canvas>
+
+                <!-- Alerta de estado flotante -->
+                <div id="detection-pill" class="absolute top-3 left-3 sm:top-4 sm:left-4 bg-slate-950/80 backdrop-blur-md px-2.5 py-1 sm:px-3.5 sm:py-1.5 rounded-lg sm:rounded-xl border border-slate-800 text-[10px] sm:text-xs font-semibold tracking-wide shadow-lg flex items-center gap-1.5 sm:gap-2 z-30">
+                    <i data-lucide="loader" class="w-3.5 h-3.5 text-indigo-500 animate-spin"></i>
+                    <span id="detection-pill-text" class="text-slate-300">Iniciando rastreador...</span>
+                </div>
+
+                <div class="absolute top-3 right-3 sm:top-4 sm:right-4 z-30">
+                    <div class="bg-slate-950/80 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-slate-800 text-[10px] text-slate-400 flex items-center gap-1.5">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-indigo-400"></i>
+                        <span>Filtro Activo: <strong id="lblActiveFilter" class="text-white">Ninguno</strong></span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Barra de Herramientas de Captura -->
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-3 bg-slate-900/40 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-800/80 w-full">
+                <div class="text-xs text-slate-400 hidden sm:block">
+                    Asegúrate de tener buena iluminación sobre tu rostro para un rastreo perfecto.
+                </div>
+                <div class="flex gap-2 w-full sm:w-auto justify-end">
+                    <button id="btnResetFilters" class="text-xs text-slate-400 hover:text-white font-medium flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-slate-850 transition">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Quitar Filtro
+                    </button>
+                    <button id="btnCapture" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition shadow-lg shadow-emerald-500/20 w-full sm:w-auto">
+                        <i data-lucide="camera" class="w-4 h-4"></i> Capturar y Descargar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTROLES Y SELECCIÓN DE FILTROS (Derecha - 4 Cols) -->
+        <div class="lg:col-span-5 xl:col-span-4 flex flex-col gap-6 w-full">
+            
+            <!-- Panel de Filtros -->
+            <div class="glass-panel p-4 sm:p-5 rounded-2xl sm:rounded-3xl shadow-xl w-full">
+                <div class="flex items-center gap-2 mb-4">
+                    <i data-lucide="wand-2" class="w-4.5 h-4.5 text-indigo-400"></i>
+                    <h3 class="font-bold text-xs sm:text-sm tracking-wider text-indigo-200 uppercase">Catálogo de Filtros</h3>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
+                    <!-- Sin Filtro -->
+                    <button class="filter-item-btn w-full p-2.5 sm:p-3.5 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/30 rounded-xl sm:rounded-2xl flex items-center gap-3 transition-all active:scale-[0.98]" data-filter="none">
+                        <div class="bg-slate-900/80 p-2 sm:p-2.5 rounded-lg sm:rounded-xl border border-slate-850 text-slate-400 shrink-0">
+                            <i data-lucide="slash" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+                        </div>
+                        <div class="text-left overflow-hidden">
+                            <h4 class="text-[11px] sm:text-xs font-bold text-white uppercase truncate">Sin Filtros</h4>
+                            <p class="text-[9px] sm:text-[11px] text-slate-400 truncate">Lienzo limpio</p>
+                        </div>
+                    </button>
+
+                    <!-- Filtro Payaso -->
+                    <button class="filter-item-btn w-full p-2.5 sm:p-3.5 bg-slate-950/60 hover:bg-slate-900 border border-slate-800/85 rounded-xl sm:rounded-2xl flex items-center gap-3 transition-all active:scale-[0.98]" data-filter="clown">
+                        <div class="bg-indigo-600/10 p-2 sm:p-2.5 rounded-lg sm:rounded-xl border border-indigo-500/20 text-indigo-400 shrink-0">
+                            <i data-lucide="smile" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+                        </div>
+                        <div class="text-left overflow-hidden">
+                            <h4 class="text-[11px] sm:text-xs font-bold text-white uppercase truncate">Payaso Festivo</h4>
+                            <p class="text-[9px] sm:text-[11px] text-slate-400 truncate">Nariz y peluca virtual</p>
+                        </div>
+                    </button>
+
+                    <!-- Filtro Clanvo -->
+                    <button class="filter-item-btn w-full p-2.5 sm:p-3.5 bg-slate-950/60 hover:bg-slate-900 border border-slate-800/85 rounded-xl sm:rounded-2xl flex items-center gap-3 transition-all active:scale-[0.98]" data-filter="clanvo">
+                        <div class="bg-indigo-600/10 p-2 sm:p-2.5 rounded-lg sm:rounded-xl border border-indigo-500/20 text-indigo-400 shrink-0">
+                            <i data-lucide="skull" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+                        </div>
+                        <div class="text-left overflow-hidden">
+                            <h4 class="text-[11px] sm:text-xs font-bold text-white uppercase truncate">Clanvo Punk</h4>
+                            <p class="text-[9px] sm:text-[11px] text-slate-400 truncate">Pinchos y parche de ojo</p>
+                        </div>
+                    </button>
+
+                    <!-- Filtro Thug Life -->
+                    <button class="filter-item-btn w-full p-2.5 sm:p-3.5 bg-slate-950/60 hover:bg-slate-900 border border-slate-800/85 rounded-xl sm:rounded-2xl flex items-center gap-3 transition-all active:scale-[0.98]" data-filter="thug">
+                        <div class="bg-indigo-600/10 p-2 sm:p-2.5 rounded-lg sm:rounded-xl border border-indigo-500/20 text-indigo-400 shrink-0">
+                            <i data-lucide="glasses" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+                        </div>
+                        <div class="text-left overflow-hidden">
+                            <h4 class="text-[11px] sm:text-xs font-bold text-white uppercase truncate">Gafas Thug</h4>
+                            <p class="text-[9px] sm:text-[11px] text-slate-400 truncate">Lentes pixeladas clásicas</p>
+                        </div>
+                    </button>
+
+                    <!-- Filtro Monóculo -->
+                    <button class="filter-item-btn w-full p-2.5 sm:p-3.5 bg-slate-950/60 hover:bg-slate-900 border border-slate-800/85 rounded-xl sm:rounded-2xl flex items-center gap-3 transition-all active:scale-[0.98]" data-filter="fancy">
+                        <div class="bg-indigo-600/10 p-2 sm:p-2.5 rounded-lg sm:rounded-xl border border-indigo-500/20 text-indigo-400 shrink-0">
+                            <i data-lucide="crown" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+                        </div>
+                        <div class="text-left overflow-hidden">
+                            <h4 class="text-[11px] sm:text-xs font-bold text-white uppercase truncate">Sofisticado</h4>
+                            <p class="text-[9px] sm:text-[11px] text-slate-400 truncate">Monóculo dorado y bigote</p>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- PIE DE PÁGINA -->
+    <footer class="w-full py-4 text-center text-[10px] sm:text-xs text-slate-500 border-t border-slate-900/80 mt-8">
+        <p>© 2026 StudioFace AR. Rastreo dinámico inteligente de alta fidelidad sin dependencias de red.</p>
+    </footer>
+
+
+    <!-- DEFINICIÓN DE ACTIVOS VECTORIALES (Vectores SVG limpios y escalables en JS) -->
+    <script>
+        const FILTER_GRAPHICS = {
+            clown: [
+                {
+                    id: 'clown-hair',
+                    name: 'Peluca de Payaso',
+                    x: 10, y: -20, w: 80, h: 50,
+                    svg: `
+                    <svg viewBox="0 0 100 60" width="100%" height="100%">
+                        <defs>
+                            <radialGradient id="hairGrad" cx="50%" cy="50%" r="50%">
+                                <stop offset="0%" stop-color="#ff9900" />
+                                <stop offset="100%" stop-color="#cc3300" />
+                            </radialGradient>
+                        </defs>
+                        <!-- Pelo Izquierdo -->
+                        <circle cx="15" cy="30" r="15" fill="url(#hairGrad)" />
+                        <circle cx="25" cy="18" r="12" fill="url(#hairGrad)" />
+                        <circle cx="20" cy="42" r="12" fill="url(#hairGrad)" />
+                        <!-- Pelo Derecho -->
+                        <circle cx="85" cy="30" r="15" fill="url(#hairGrad)" />
+                        <circle cx="75" cy="18" r="12" fill="url(#hairGrad)" />
+                        <circle cx="80" cy="42" r="12" fill="url(#hairGrad)" />
+                        <!-- Parte superior -->
+                        <circle cx="35" cy="12" r="10" fill="url(#hairGrad)" />
+                        <circle cx="50" cy="10" r="10" fill="url(#hairGrad)" />
+                        <circle cx="65" cy="12" r="10" fill="url(#hairGrad)" />
+                    </svg>`
+                },
+                {
+                    id: 'clown-nose',
+                    name: 'Nariz Roja',
+                    x: 42, y: 40, w: 16, h: 16,
+                    svg: `
+                    <svg viewBox="0 0 40 40" width="100%" height="100%">
+                        <defs>
+                            <radialGradient id="noseGrad" cx="35%" cy="35%" r="60%">
+                                <stop offset="0%" stop-color="#ff6b6b" />
+                                <stop offset="70%" stop-color="#d90429" />
+                                <stop offset="100%" stop-color="#7a0010" />
+                            </radialGradient>
+                        </defs>
+                        <circle cx="20" cy="20" r="18" fill="url(#noseGrad)" />
+                        <ellipse cx="14" cy="14" rx="4" ry="2" fill="white" opacity="0.6" transform="rotate(-20 14 14)"/>
+                    </svg>`
+                }
+            ],
+            clanvo: [
+                {
+                    id: 'clanvo-mohawk',
+                    name: 'Cresta de Pinchos',
+                    x: 30, y: -30, w: 40, h: 45,
+                    svg: `
+                    <svg viewBox="0 0 80 100" width="100%" height="100%">
+                        <defs>
+                            <linearGradient id="spikeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#4f46e5" />
+                                <stop offset="50%" stop-color="#ec4899" />
+                                <stop offset="100%" stop-color="#f43f5e" />
+                            </linearGradient>
+                        </defs>
+                        <!-- Pinchos Punk Metálicos -->
+                        <path d="M 10 100 L 20 20 L 30 100" fill="url(#spikeGrad)" />
+                        <path d="M 25 100 L 40 5 L 55 100" fill="url(#spikeGrad)" />
+                        <path d="M 50 100 L 60 20 L 70 100" fill="url(#spikeGrad)" />
+                    </svg>`
+                },
+                {
+                    id: 'clanvo-eyepatch',
+                    name: 'Parche Gótico',
+                    x: 52, y: 22, w: 18, h: 18,
+                    svg: `
+                    <svg viewBox="0 0 40 40" width="100%" height="100%">
+                        <!-- Correa -->
+                        <line x1="0" y1="10" x2="40" y2="25" stroke="#111827" stroke-width="4" />
+                        <!-- Parche -->
+                        <circle cx="20" cy="20" r="14" fill="#030712" stroke="#4b5563" stroke-width="2"/>
+                        <!-- Detalle metal -->
+                        <circle cx="20" cy="20" r="4" fill="#9ca3af" />
+                    </svg>`
+                }
+            ],
+            thug: [
+                {
+                    id: 'thug-glasses',
+                    name: 'Gafas Pixeladas',
+                    x: 25, y: 22, w: 50, h: 15,
+                    svg: `
+                    <svg viewBox="0 0 100 30" width="100%" height="100%">
+                        <!-- Lente Izquierdo -->
+                        <rect x="5" y="8" width="38" height="15" fill="#111827" stroke="#4b5563" stroke-width="1.5" />
+                        <!-- Lente Derecho -->
+                        <rect x="57" y="8" width="38" height="15" fill="#111827" stroke="#4b5563" stroke-width="1.5" />
+                        <!-- Puente -->
+                        <rect x="43" y="11" width="14" height="4" fill="#111827" />
+                        <!-- Brillos Blancos de estilo Pixel -->
+                        <rect x="10" y="11" width="6" height="4" fill="#ffffff" />
+                        <rect x="16" y="15" width="6" height="4" fill="#ffffff" opacity="0.8" />
+                        <rect x="62" y="11" width="6" height="4" fill="#ffffff" />
+                        <rect x="68" y="15" width="6" height="4" fill="#ffffff" opacity="0.8" />
+                    </svg>`
+                }
+            ],
+            fancy: [
+                {
+                    id: 'fancy-monocle',
+                    name: 'Monóculo de Oro',
+                    x: 55, y: 20, w: 18, h: 40,
+                    svg: `
+                    <svg viewBox="0 0 40 100" width="100%" height="100%">
+                        <!-- Aro del monóculo -->
+                        <circle cx="20" cy="20" r="16" fill="rgba(129, 140, 248, 0.15)" stroke="#f59e0b" stroke-width="3" />
+                        <!-- Brillo de cristal -->
+                        <path d="M 8 15 A 16 16 0 0 1 25 8" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.6" />
+                        <!-- Cadena de oro -->
+                        <path d="M 34 25 C 38 45, 28 75, 10 95" fill="none" stroke="#fbbf24" stroke-width="2" stroke-dasharray="3,3" />
+                    </svg>`
+                },
+                {
+                    id: 'fancy-mustache',
+                    name: 'Bigote Imperial',
+                    x: 35, y: 48, w: 30, h: 14,
+                    svg: `
+                    <svg viewBox="0 0 100 40" width="100%" height="100%">
+                        <!-- Bigote izquierdo y derecho unificados -->
+                        <path d="M 50 15 C 35 15, 20 0, 5 15 C -2 20, 5 35, 18 35 C 30 35, 42 20, 50 25 C 58 20, 70 35, 82 35 C 95 35, 102 20, 95 15 C 80 0, 65 15, 50 15 Z" fill="#1e293b" stroke="#0f172a" stroke-width="2" />
+                    </svg>`
+                }
+            ]
+        };
+    </script>
+
+    <script>
+        // Elementos del DOM
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusText = document.getElementById('status-text');
+        const detectionPill = document.getElementById('detection-pill');
+        const detectionPillText = document.getElementById('detection-pill-text');
+        const webcam = document.getElementById('webcam');
+        const arCanvas = document.getElementById('arCanvas');
+        const btnResetFilters = document.getElementById('btnResetFilters');
+        const btnCapture = document.getElementById('btnCapture');
+        const lblActiveFilter = document.getElementById('lblActiveFilter');
+
+        // Pantalla de permisos
+        const permissionOverlay = document.getElementById('permission-overlay');
+        const btnRequestPermission = document.getElementById('btnRequestPermission');
+        const permissionTitle = document.getElementById('permission-title');
+        const permissionDesc = document.getElementById('permission-desc');
+        const permissionIconContainer = document.getElementById('permission-icon-container');
+
+        let tracker = null;
+        let isTrackerReady = false;
+        let liveTrackingActive = false;
+        let trackingLoopId = null;
+        let preloadedAssets = {};
+
+        // Función para pre-cargar las imágenes vectoriales y asegurar un rendimiento óptimo de 60fps
+        function preloadAssets() {
+            for (const filterName in FILTER_GRAPHICS) {
+                preloadedAssets[filterName] = FILTER_GRAPHICS[filterName].map(asset => {
+                    const img = new Image();
+                    img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(asset.svg);
+                    return {
+                        id: asset.id,
+                        img: img,
+                        w: asset.w,
+                        h: asset.h
+                    };
+                });
+            }
+        }
+
+        // Comprobación segura de carga de la librería de seguimiento facial clmtrackr
+        function checkClmtrackrLoad() {
+            if (typeof clm !== 'undefined' && typeof pModel !== 'undefined') {
+                statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse";
+                statusText.textContent = "Listo para iniciar cámara";
+                isTrackerReady = true;
+                
+                try {
+                    tracker = new clm.tracker();
+                    tracker.init(pModel);
+                } catch(e) {
+                    console.warn("Fallo de inicialización pasiva de tracker:", e);
+                }
+                
+                // Una vez cargadas las dependencias de IA, solicitamos cámara inmediatamente
+                requestCamera();
+            } else {
+                setTimeout(checkClmtrackrLoad, 300);
+            }
+        }
+
+        // Intento directo e inmediato de conexión a la webcam
+        async function requestCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+                    audio: false
+                });
+
+                webcam.srcObject = stream;
+                webcam.onloadedmetadata = () => {
+                    webcam.play();
+                    
+                    // Configurar dimensiones de procesamiento
+                    arCanvas.width = webcam.videoWidth;
+                    arCanvas.height = webcam.videoHeight;
+                    
+                    // Inicializar el tracker de clmtrackr con el video activo
+                    if (isTrackerReady && tracker) {
+                        try {
+                            tracker.stop();
+                            tracker.start(webcam);
+                        } catch(err) {
+                            console.error("Error al arrancar tracker:", err);
+                        }
+                    }
+
+                    liveTrackingActive = true;
+                    detectionPillText.textContent = "Buscando rostro...";
+                    detectionPill.querySelector('i').className = "w-3.5 h-3.5 text-indigo-400 animate-pulse";
+                    statusText.textContent = "Cámara conectada";
+                    statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-emerald-500";
+
+                    // Esconder la pantalla de carga/solicitud
+                    permissionOverlay.classList.add('hidden');
+
+                    // Arrancar el bucle principal de dibujo
+                    if (trackingLoopId) cancelAnimationFrame(trackingLoopId);
+                    runLiveRenderLoop();
+                };
+            } catch(err) {
+                console.warn("Acceso a cámara rechazado o bloqueado por el navegador:", err);
+                
+                // Mostrar UI de error instructivo
+                permissionTitle.textContent = "Acceso a Cámara Denegado";
+                permissionTitle.className = "text-xl font-bold mb-3 text-rose-500";
+                permissionDesc.textContent = "No logramos iniciar tu cámara. Por favor haz clic en el botón de abajo o activa los permisos de cámara en la barra de direcciones de tu navegador para que los filtros AR funcionen.";
+                permissionIconContainer.className = "w-16 h-16 bg-rose-500/15 text-rose-400 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-rose-500/20";
+                permissionIconContainer.innerHTML = '<i data-lucide="video-off" class="w-8 h-8"></i>';
+                
+                btnRequestPermission.classList.remove('hidden');
+                
+                statusText.textContent = "Acceso bloqueado";
+                statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-rose-500";
+                lucide.createIcons();
+            }
+        }
+
+        // Reintentar acceso a petición del usuario
+        btnRequestPermission.addEventListener('click', () => {
+            permissionTitle.textContent = "Solicitando Cámara";
+            permissionTitle.className = "text-xl font-bold mb-3 text-white";
+            permissionDesc.textContent = "Por favor, acepta el permiso de la cámara para que el sistema de inteligencia artificial pueda aplicar los filtros en tiempo real sobre tu rostro.";
+            permissionIconContainer.className = "w-16 h-16 bg-indigo-600/15 text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-indigo-500/20 animate-pulse";
+            permissionIconContainer.innerHTML = '<i data-lucide="camera" class="w-8 h-8"></i>';
+            btnRequestPermission.classList.add('hidden');
+            lucide.createIcons();
+            requestCamera();
+        });
+
+        // Bucle principal de renderizado en tiempo real
+        const ctx = arCanvas.getContext('2d');
+        function runLiveRenderLoop() {
+            if (!liveTrackingActive) return;
+
+            // 1. Limpiar el canvas
+            ctx.clearRect(0, 0, arCanvas.width, arCanvas.height);
+
+            // 2. Dibujar el fotograma del video con efecto de espejo para que sea cómodo de usar
+            ctx.save();
+            ctx.translate(arCanvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(webcam, 0, 0, arCanvas.width, arCanvas.height);
+
+            // 3. Obtener coordenadas del rostro e integrar el filtro vectorial
+            if (isTrackerReady && tracker) {
+                const positions = tracker.getCurrentPosition();
+                if (positions && positions.length > 20) {
+                    // Actualizar el estado visual en el pill flotante
+                    detectionPillText.textContent = "Rostro Rastreado";
+                    detectionPill.querySelector('i').className = "w-3.5 h-3.5 text-emerald-400 animate-bounce";
+                    
+                    // Renderizar los filtros usando el sistema de dibujo espejo para máxima alineación
+                    renderARFiltersOnCanvas(positions);
+                } else {
+                    detectionPillText.textContent = "Buscando rostro...";
+                    detectionPill.querySelector('i').className = "w-3.5 h-3.5 text-indigo-500 animate-spin";
+                }
+            }
+
+            ctx.restore(); // Restaurar el canvas para el siguiente ciclo
+            trackingLoopId = requestAnimationFrame(runLiveRenderLoop);
+        }
+
+        // Renderiza los gráficos SVG sobre la cara del usuario siguiendo su escala y rotación
+        function renderARFiltersOnCanvas(positions) {
+            const activeBtn = document.querySelector('.filter-item-btn.bg-indigo-600\\/10');
+            const activeFilter = activeBtn ? activeBtn.getAttribute('data-filter') : 'none';
+
+            if (activeFilter === 'none') return;
+
+            const assets = preloadedAssets[activeFilter];
+            if (!assets) return;
+
+            // Coordenadas oculares para escala y balance de rotación
+            const leftEyeX = positions[27][0];
+            const leftEyeY = positions[27][1];
+            const rightEyeX = positions[32][0];
+            const rightEyeY = positions[32][1];
+
+            const eyeDist = Math.sqrt(Math.pow(rightEyeX - leftEyeX, 2) + Math.pow(rightEyeY - leftEyeY, 2));
+            const angle = Math.atan2(rightEyeY - leftEyeY, rightEyeX - leftEyeX);
+
+            assets.forEach(asset => {
+                const img = asset.img;
+
+                if (img.complete && img.naturalWidth > 0) {
+                    ctx.save();
+                    
+                    let targetX, targetY;
+
+                    // Posicionamiento anatómico dinámico inteligente
+                    if (asset.id.includes('nose')) {
+                        targetX = positions[62][0];
+                        targetY = positions[62][1];
+                    } else if (asset.id.includes('hair') || asset.id.includes('mohawk')) {
+                        targetX = (leftEyeX + rightEyeX) / 2;
+                        targetY = (leftEyeY + rightEyeY) / 2 - (eyeDist * 1.1);
+                    } else if (asset.id.includes('glasses')) {
+                        targetX = (leftEyeX + rightEyeX) / 2;
+                        targetY = (leftEyeY + rightEyeY) / 2;
+                    } else if (asset.id.includes('monocle')) {
+                        targetX = leftEyeX;
+                        targetY = leftEyeY;
+                    } else if (asset.id.includes('mustache')) {
+                        targetX = positions[47][0];
+                        targetY = positions[47][1] - (eyeDist * 0.1);
+                    } else {
+                        targetX = positions[62][0];
+                        targetY = positions[62][1];
+                    }
+
+                    // Escalamiento preciso basado en la profundidad de la cabeza (distancia interocular)
+                    const baseWidth = eyeDist * 2.2;
+                    const finalWidth = baseWidth * (asset.w / 50);
+                    const finalHeight = finalWidth * (asset.h / asset.w);
+
+                    // Transformaciones locales del canvas para dibujar en el punto exacto
+                    ctx.translate(targetX, targetY);
+                    ctx.rotate(angle); 
+                    ctx.drawImage(img, -finalWidth / 2, -finalHeight / 2, finalWidth, finalHeight);
+                    
+                    ctx.restore();
+                }
+            });
+        }
+
+
+        // Controladores de selección de filtros
+        const filterButtons = document.querySelectorAll('.filter-item-btn');
+        filterButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                filterButtons.forEach(b => {
+                    b.className = "filter-item-btn w-full p-2.5 sm:p-3.5 bg-slate-950/60 hover:bg-slate-900 border border-slate-800/85 rounded-xl sm:rounded-2xl flex items-center gap-3 transition-all active:scale-[0.98]";
+                    b.querySelector('div').className = "bg-indigo-600/10 p-2 sm:p-2.5 rounded-lg sm:rounded-xl border border-indigo-500/20 text-indigo-400 shrink-0";
+                });
+
+                btn.className = "filter-item-btn w-full p-2.5 sm:p-3.5 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/30 rounded-xl sm:rounded-2xl flex items-center gap-3 transition-all active:scale-[0.98]";
+                btn.querySelector('div').className = "bg-indigo-600 p-2 sm:p-2.5 rounded-lg sm:rounded-xl border border-indigo-500/30 text-white animate-pulse shrink-0";
+
+                const filterName = btn.getAttribute('data-filter');
+                lblActiveFilter.textContent = filterName === 'none' ? 'Ninguno' : btn.querySelector('h4').textContent;
+            });
+        });
+
+        // QUITAR FILTRO
+        btnResetFilters.addEventListener('click', () => {
+            const noFilterBtn = document.querySelector('[data-filter="none"]');
+            if (noFilterBtn) noFilterBtn.click();
+        });
+
+
+        // CAPTURA Y DESCARGA DIRECTA DE LA FOTO PROCESADA
+        btnCapture.addEventListener('click', () => {
+            if (!liveTrackingActive) return;
+            
+            try {
+                // Generar un link temporal para descargar el estado actual del canvas de procesamiento
+                const dataUrl = arCanvas.toDataURL('image/jpeg', 0.95);
+                const link = document.createElement('a');
+                link.download = `studioface-ar-${Date.now()}.jpg`;
+                link.href = dataUrl;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch(e) {
+                alert("Hubo un problema al procesar y guardar la imagen. Revisa los permisos de almacenamiento.");
+            }
+        });
+
+        // Inicialización tras cargar todo el DOM de forma síncrona
+        window.addEventListener('DOMContentLoaded', () => {
+            preloadAssets();
+            checkClmtrackrLoad();
+            lucide.createIcons();
+        });
+    </script>
+</body>
+</html>

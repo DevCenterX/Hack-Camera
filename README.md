@@ -32,7 +32,7 @@ Instalación automática
   - `curl`
   - `wget`
   - `unzip`
-- Ya no es necesario usar `setup` o `setup.sh`.
+
 
 Advertencia
 - Usa esta herramienta solo en entornos de prueba y con permiso explícito.

